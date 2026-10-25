@@ -328,6 +328,11 @@ class JiboCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
 
         try:
+            if command == "entity_control":
+                from .entity_control import handle_entity_control
+                await handle_entity_control(self, payload, request_id)
+                return
+
             if command == "lights_off_current_room":
                 await self._handle_lights_room("turn_off", request_id)
                 return
@@ -425,6 +430,14 @@ class JiboCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 request_id, "not_found", heard_name=heard_name
             )
             return
+
+        # Resolve exact names, aliases, Areas and ambiguities before the legacy fuzzy matcher.
+        if hasattr(self.hass, "states"):
+            from .entity_control import handle_entity_control
+            if await handle_entity_control(self, {"domain": "light", "action": service,
+                    "scope": "named", "targetName": target_name}, request_id,
+                    allow_legacy_fallback=True):
+                return
 
         area_id = self._get_jibo_area_id()
         entity_id = self._find_matching_light(target_name, area_id)

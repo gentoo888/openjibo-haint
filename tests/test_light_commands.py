@@ -33,6 +33,11 @@ except ImportError:
     aiohttp = module('aiohttp')
     aiohttp.ClientTimeout = lambda **kw: kw
     aiohttp.ClientSession = None
+if not hasattr(aiohttp, 'ClientSession'):
+    aiohttp.ClientSession = None
+if not hasattr(aiohttp, 'ClientTimeout'):
+    aiohttp.ClientTimeout = lambda **kw: kw
+if not hasattr(aiohttp, 'WSMsgType'):
     aiohttp.WSMsgType = types.SimpleNamespace(CLOSE=1, CLOSED=2, ERROR=3, TEXT=4)
 from custom_components.jibo.coordinator import JiboCoordinator
 from custom_components.jibo.websocket_client import OpenJiboWebSocketClient

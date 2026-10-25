@@ -91,3 +91,65 @@ Camera streaming is enabled for on-robot testing without a validation record.
 See `BEam/docs/camera-streaming.md` in the BEcosystem workspace for native
 transport details and testing steps. Streaming performance still needs to be
 measured on a real Jibo. Cloud-only OpenJibo pairings do not expose these local camera entities.
+
+## Everyday voice controls (5x1 / self-hosted BEefy)
+
+Integration **1.1.0.0** adds `entity_control` support. Install this integration,
+then a BEam native relay or BEnch relay build that forwards `domain`, `scope`,
+`value`, and `unit`, then the BEefy build containing
+`HomeAssistantEntityCommandParser`. Restart/reload each updated component.
+All three components are required; an older relay drops new action parameters.
+Existing pairing and legacy commands remain supported. This expansion does not
+add new server capabilities to OpenJibo.com or self-hosted legacy OpenJibo.
+
+| Device | Example commands |
+| --- | --- |
+| Lights | “Set the bedroom lights blue”; “Set the lights to 40 percent”; “Set the desk lamp to warm white”; “Set the lights to 3000 Kelvin” |
+| Thermostats | “Set the bedroom thermostat to 72”; “Set the thermostat to 20 Celsius”; “Set the thermostat to heat”; “Turn off the thermostat” |
+| Switches | “Turn on the desk switch”; “Turn off the switches in the bedroom” |
+| Fans | “Turn on the fan”; “Set the office fan to 50 percent” |
+| Covers / blinds / shades / curtains | “Open the bedroom blinds”; “Stop the curtains”; “Set the blinds to 25 percent” |
+| Scenes | “Activate scene movie time” |
+| Scripts | “Run the bedtime script” |
+
+Light colors: red, green, blue, yellow, orange, purple, pink, white, cyan, and
+magenta. White temperature accepts warm white, cool white, or Kelvin. Warm/cool
+white use 2700/6500 K within the device's supported range. Thermostat modes are
+heat, cool, heat cool, auto, off, dry, and fan only, where supported by the entity.
+Existing warmer/cooler requests and indoor temperature queries continue to work.
+Explicit Celsius/Fahrenheit requests convert to HA's configured temperature unit;
+requests without a unit retain existing HA temperature behavior.
+
+Unnamed commands use Jibo's Area. Plural room requests such as “bedroom lights”
+select matching entities in that Area, including inherited device Areas. Named
+single devices use entity names/aliases first, then an Area of that name. Multiple
+single-device matches prompt for a choice; answer with a unique displayed name
+or entity ID, or say “cancel.” Pending choices expire after 60 seconds. Scenes and
+scripts require their entity names. Whole-home requests require explicit wording,
+such as “turn off all lights.”
+
+Capabilities and values are checked before group actions run. An unavailable or
+unsupported group member rejects the request. Percentages must be between 0 and
+100; cover position 0 is closed and 100 is open. A service failure during execution
+can leave part of a group changed. Jibo confirms HA service completion, rather
+than physical device state or completion of a running script. Timeouts are not
+retried automatically because the action may already have run.
+
+### Real-device smoke checklist
+
+After upgrading all components, use a test Area and confirm HA's service traces
+and the resulting device behavior:
+
+1. Light: on/off, brightness 0/50/100, blue, warm/cool white, and an in-range Kelvin
+   value; try color on an on/off-only light and verify rejection.
+2. Thermostat: existing setpoint/query/warmer/cooler commands, supported heat/cool/off
+   modes, and an explicit temperature in the opposite unit; reject an unsupported mode.
+3. Switch: named on/off and a room command; verify another Area stays unchanged.
+4. Fan: on/off and 0/50/100 percent; reject speed on a fan without speed support.
+5. Cover: open, close, stop, and 25 percent; reject position on an unsupported cover.
+6. Scene/script: activate by name and check a missing name causes no action.
+7. Assign duplicate aliases, request a single device, and verify no call occurs
+   before clarification. Choose one, repeat with cancellation, and test expiry.
+8. Test inherited and overridden Areas, mixed-capability groups, an unavailable
+   device, disconnected HA, and missing pairing. Correlate each request/result ID;
+   verify one dispatch per request and no automatic retry after a timeout.
