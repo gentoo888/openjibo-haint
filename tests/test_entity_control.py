@@ -184,3 +184,43 @@ class EntityControlTests(unittest.IsolatedAsyncioTestCase):
             action='turn_on', scope='named', targetName='missing'), authenticated=True)
         self.assertEqual(self.coordinator._send_command_result.call_args.args[1], 'not_found')
         self.coordinator.hass.services.async_call.assert_not_awaited()
+
+
+class ConversationTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        fixtures.LightTests.setUp(self)
+        self.call = self.coordinator.hass.services.async_call
+
+    async def converse(self, text, response=None):
+        self.call.return_value = {'response': response} if response else None
+        await self.coordinator._handle_command(dict(command='conversation', requestId='r', text=text), authenticated=True)
+        return self.coordinator._send_command_result.await_args
+
+    async def test_assist_answer_is_spoken(self):
+        result = await self.converse('lock the front door', {'response_type': 'action_done',
+            'speech': {'plain': {'speech': 'Locked the front door'}}})
+        self.call.assert_awaited_once_with('conversation', 'process',
+            {'text': 'lock the front door', 'agent_id': 'conversation.home_assistant'}, blocking=True, return_response=True)
+        self.assertEqual(result.args, ('r', 'ok')); self.assertEqual(result.kwargs, {'speech': 'Locked the front door'})
+
+    async def test_unmatched_sentence_lets_jibo_carry_on(self):
+        result = await self.converse('who wrote hamlet', {'response_type': 'error', 'data': {'code': 'no_intent_match'},
+            'speech': {'plain': {'speech': "Sorry, I couldn't understand that"}}})
+        self.assertEqual(result.args, ('r', 'not_found'))
+
+    async def test_assist_errors_are_never_spoken(self):
+        result = await self.converse('tell me a story', {'response_type': 'error', 'data': {'code': 'no_valid_targets'},
+            'speech': {'plain': {'speech': 'Sorry, I am not aware of any device called a story'}}})
+        self.assertEqual(result.args, ('r', 'not_found'))
+
+    async def test_query_answer_is_spoken(self):
+        result = await self.converse('is the front door locked', {'response_type': 'query_answer',
+            'speech': {'plain': {'speech': 'Yes, Front Door is locked'}}})
+        self.assertEqual(result.kwargs, {'speech': 'Yes, Front Door is locked'})
+
+    async def test_bad_text_is_rejected_without_calling_assist(self):
+        for text in (None, '  ', 'x' * 501):
+            result = await self.converse(text)
+            self.assertEqual(result.kwargs, {'message': 'invalid_value'})
+        self.call.assert_not_awaited()
+

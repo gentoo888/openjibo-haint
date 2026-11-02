@@ -1,13 +1,17 @@
 {
   "domain": "jibo",
   "name": "OpenJibo",
-  "codeowners": ["@ZaneThePython"],
+  "codeowners": [
+    "@ZaneThePython"
+  ],
   "config_flow": true,
-  "dependencies": ["ffmpeg"],
+  "dependencies": [
+    "ffmpeg"
+  ],
   "documentation": "https://jibo.guide/haint",
   "integration_type": "device",
   "iot_class": "cloud_push",
   "issue_tracker": "https://github.com/Jibo-Revival-Group/openjibo-haint/issues",
   "requirements": [],
-  "version": "1.1.0.0"
+  "version": "1.2.0.0"
 }

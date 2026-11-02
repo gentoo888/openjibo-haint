@@ -277,6 +277,7 @@ class JiboCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         message: str | None = None,
         current_temperature: float | None = None,
         unit: str | None = None,
+        speech: str | None = None,
     ) -> None:
         payload: dict[str, Any] = {
             "type": "command_result",
@@ -295,6 +296,8 @@ class JiboCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             payload["currentTemperature"] = current_temperature
         if unit:
             payload["unit"] = unit
+        if speech:
+            payload["speech"] = speech
 
         _LOGGER.info("OpenJibo command result requestId=%s status=%s message=%s",
                      request_id, status, message)
@@ -308,6 +311,25 @@ class JiboCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         sent = await self._client.async_send_json(payload)
         if not sent:
             _LOGGER.warning("Failed to send command_result for request %s", request_id)
+
+    async def _handle_conversation(self, text: Any, request_id: str | None) -> None:
+        """Sentences BEefy didn't handle go to HA's built-in Assist (never a user's LLM agent),
+        whose Expose settings decide what Jibo may control."""
+        if not isinstance(text, str) or not text.strip() or len(text) > 500:
+            await self._send_command_result(request_id, "error", message="invalid_value")
+            return
+        result = await self.hass.services.async_call(
+            "conversation", "process",
+            {"text": text.strip(), "agent_id": "conversation.home_assistant"},
+            blocking=True, return_response=True)
+        response = (result or {}).get("response") or {}
+        speech = ((response.get("speech") or {}).get("plain") or {}).get("speech")
+        # Assist matches loosely ("tell me a story" → "no device called a story"), so its errors
+        # never reach the user: Jibo carries on as usual. Only real answers and actions are spoken.
+        if not speech or response.get("response_type") not in ("action_done", "query_answer"):
+            await self._send_command_result(request_id, "not_found")
+            return
+        await self._send_command_result(request_id, "ok", speech=speech)
 
     async def _handle_command(
         self, payload: dict[str, Any], *, authenticated: bool = False
@@ -328,6 +350,10 @@ class JiboCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return
 
         try:
+            if command == "conversation":
+                await self._handle_conversation(payload.get("text"), request_id)
+                return
+
             if command == "entity_control":
                 from .entity_control import handle_entity_control
                 await handle_entity_control(self, payload, request_id)

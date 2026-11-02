@@ -135,6 +135,17 @@ can leave part of a group changed. Jibo confirms HA service completion, rather
 than physical device state or completion of a running script. Timeouts are not
 retried automatically because the action may already have run.
 
+### Anything else Assist understands (1.2.0.0)
+
+When Jibo hears something none of his own commands handle, he asks Home Assistant's built-in Assist (Settings › Voice assistants) before falling back to his usual answers. That brings everything Assist understands to Jibo, for example:
+- Locks: “Is the front door locked?”, “Lock the front door”
+- Media players: “Pause the living room”, “Set the TV volume to 20”
+- States and sensors: “Is the garage door open?”, “What's the humidity in the bedroom?”
+- To-do lists: “Add milk to my shopping list”
+- Your own custom sentences and intent scripts
+
+Jibo only speaks Assist's answers and confirmations. If Assist doesn't understand the sentence or reports an error, Jibo carries on as if it hadn't asked. It always uses Home Assistant's built-in agent, even if you've set an AI agent as your default. Assist only controls entities exposed to it (Settings › Voice assistants › Expose); locks and alarms are not exposed by default, so expose them only if you're comfortable with anyone near Jibo using them. Needs this integration, BEam or BEnch beta with the relay update, and BEefy from November 2026.
+
 ### Real-device smoke checklist
 
 After upgrading all components, use a test Area and confirm HA's service traces
