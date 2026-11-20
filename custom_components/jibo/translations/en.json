@@ -1,5 +1,6 @@
 {
   "config": {
+    "flow_title": "{name}",
     "step": {
       "user": {
         "title": "Which Server is Used?",
@@ -68,7 +69,8 @@
     },
     "abort": {
       "already_configured": "This OpenJibo connection is already configured.",
-      "not_supported": "Not Supported"
+      "not_supported": "Not Supported",
+      "not_jibo": "This device is not a Jibo running BEacon."
     }
   },
   "entity": {

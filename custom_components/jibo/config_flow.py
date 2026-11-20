@@ -3,6 +3,7 @@ import uuid
 import aiohttp
 import voluptuous as vol
 from homeassistant import config_entries
+from homeassistant.helpers.service_info.zeroconf import ZeroconfServiceInfo
 
 from .const import (
     BEACON_PORT,
@@ -28,6 +29,23 @@ from .const import (
 
 class JiboConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     VERSION = 1
+    _discovered_ip = ""
+
+    async def async_step_zeroconf(self, discovery_info: ZeroconfServiceInfo):
+        # Jibo's avahi only advertises SSH under the robot name, so confirm BEacon answers.
+        ip = str(discovery_info.ip_address)
+        if discovery_info.ip_address.version != 4:
+            return self.async_abort(reason="not_jibo")
+        await self.async_set_unique_id(f"beefy:{ip}")
+        self._abort_if_unique_id_configured()
+        name = await _beacon_hostname(ip)
+        if not name:
+            return self.async_abort(reason="not_jibo")
+        self._async_abort_entries_match({CONF_JIBO_IP: ip})
+        self._async_abort_entries_match({"name": name})
+        self._discovered_ip = ip
+        self.context["title_placeholders"] = {"name": name}
+        return await self.async_step_user()
 
     async def async_step_user(self, user_input=None):
         return self.async_show_menu(
@@ -67,7 +85,7 @@ class JiboConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required("name"): str,
-                    vol.Optional(CONF_JIBO_IP, default=""): str,
+                    vol.Optional(CONF_JIBO_IP, default=self._discovered_ip): str,
                 }
             ),
             errors=errors,
@@ -90,7 +108,7 @@ class JiboConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 {
                     vol.Required(CONF_SERVER_URL): str,
                     vol.Required("name"): str,
-                    vol.Optional(CONF_JIBO_IP, default=""): str,
+                    vol.Optional(CONF_JIBO_IP, default=self._discovered_ip): str,
                 }
             ),
             errors=errors,
@@ -140,7 +158,7 @@ class JiboConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id=step_id,
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_JIBO_IP): str,
+                    vol.Required(CONF_JIBO_IP, default=self._discovered_ip or vol.UNDEFINED): str,
                 }
             ),
             errors=errors,
@@ -209,6 +227,21 @@ async def _pair_with_robot(jibo_ip: str, payload: dict) -> tuple[str | None, str
     if payload.get("mode") not in BEEFY_MODES:
         return "unknown", None
     return None, password
+
+
+async def _beacon_hostname(jibo_ip: str) -> str | None:
+    """Robot name from BEacon's /api/status, or None if the host isn't a Jibo running BEacon."""
+    url = f"http://{jibo_ip}:{BEACON_PORT}/api/status"
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=5)) as session:
+            async with session.get(url) as response:
+                body = await response.json(content_type=None) if response.status == 200 else None
+    except (TimeoutError, aiohttp.ClientError, ValueError):
+        return None
+    if not isinstance(body, dict) or body.get("name") != "BEacon":
+        return None
+    name = body.get("hostname")
+    return name.strip() if isinstance(name, str) and name.strip() else f"Jibo ({jibo_ip})"
 
 
 async def _robot_name(jibo_ip: str) -> str:

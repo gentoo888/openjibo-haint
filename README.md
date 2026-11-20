@@ -15,6 +15,8 @@ This Home Assistant integration lets your Jibo control:
 2. Search for OpenJibo
 3. Choose **Which Server is Used?**
 
+Jibos on the same network show up on their own (1.3.0.0): Home Assistant shows **Discovered: <robot name>** under Devices. Click **Add**, choose the server, and the robot's IP is already filled in. Discovery needs BEacon on the robot.
+
 ### 5x1
 Uses BEefy at `api.5x1.com`. Enter the Jibo's IP address. The robot shows that Home Assistant machine's IP and asks Yes or No. On Yes it saves a shared password and points its conversation server at `api.5x1.com`. After that, BEefy tells the robot what to send when you say things like "turn on the lights," and the robot calls Home Assistant. If the Jibo's IP changes, it tells Home Assistant the new address and proves it with the password.
 
